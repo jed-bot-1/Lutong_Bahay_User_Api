@@ -148,75 +148,91 @@ const loginUser = async (req, res,next) => {
     }
 };
 //OTP logic 
-const requestPasswordOtp = async (req,res,next) =>{
-    try{
-        const {email} = req.body;
-
+const requestPasswordOtp = async (req, res, next) => {
+    try {
+        const { email } = req.body;
         const user = await User.findOne({ email });
-        if(!user){
-            return notFoundError(req,res,next);
+        if (!user) {
+            return notFoundError(req, res, next);
         }
-
-        // generate the otp
-        const otp = crypto.randomInt(100000,999999).toString();
+        
+        // Generate the OTP
+        const otp = crypto.randomInt(100000, 999999).toString();
         user.otp = otp;
-        user.otpExpiry = Date.now() + 10*60*1000;//adding a 10 minute expiry time
+        user.otpExpiry = Date.now() + 10 * 60 * 1000; // 10 minute expiry
         await user.save();
-
-        //sending the otp to the email
-       const apiInstance = new brevo.TransactionalEmailsApi();
-       apiInstance.setApiKey(
-        brevo.TransactionalEmailsApiApiKeys.apiKey,
-        process.env.BREVO_API_KEY
-       );
-       const sendSmtpEmail = new brevo.SendSmtpEmail();
-       sendSmtpEmail.sender = { name: 'Lutong Bahay', email: process.env.EMAIL_USER };
-sendSmtpEmail.to = [{ email }]; // changed key from "mail" -> "email"
-sendSmtpEmail.subject = "Password Reset Request";
-sendSmtpEmail.textContent = `
-  Your one-time password (OTP) is: ${otp}.
-  This code is valid for 10 minutes.
-  Do not share it with anyone for security reasons.
-`;
-
-       await apiInstance.sendTransacEmail(sendSmtpEmail);
-
-    // 6️⃣ Respond success
-    res.status(200).json({ message: 'OTP has been sent to your email' });
-
-    }catch(error){
+        
+        console.log('OTP saved:', user.otp); // Debug log
+        
+        // Sending the OTP to the email
+        const apiInstance = new brevo.TransactionalEmailsApi();
+        apiInstance.setApiKey(
+            brevo.TransactionalEmailsApiApiKeys.apiKey,
+            process.env.BREVO_API_KEY
+        );
+        const sendSmtpEmail = new brevo.SendSmtpEmail();
+        sendSmtpEmail.sender = { name: 'Lutong Bahay', email: process.env.EMAIL_USER };
+        sendSmtpEmail.to = [{ email }];
+        sendSmtpEmail.subject = "Password Reset Request";
+        sendSmtpEmail.textContent = `
+Your one-time password (OTP) is: ${otp}.
+This code is valid for 10 minutes.
+Do not share it with anyone for security reasons.
+        `;
+        await apiInstance.sendTransacEmail(sendSmtpEmail);
+        
+        res.status(200).json({ message: 'OTP has been sent to your email' });
+    } catch (error) {
         next(error);
     }
 }
-// Forgot Password 
-const forgotPassword = async (req, res,next) => {
-    try {
-        const { email, newPassword,otp } = req.body;
 
+// Forgot Password 
+const forgotPassword = async (req, res, next) => {
+    try {
+        const { email, newPassword, otp } = req.body;
+        
+        console.log('Received OTP:', otp); // Debug
+        
         // Check if user exists
         const user = await User.findOne({ email });
-         if (!user) {
-           return notFoundError(req,res,next);
+        if (!user) {
+            return notFoundError(req, res, next);
         }
-        if(!user.otp){
-            return Incorrect(req,res)
+        
+        console.log('DB OTP:', user.otp); // Debug
+        console.log('DB Expiry:', user.otpExpiry, 'Now:', Date.now()); // Debug
+        
+        // Check if OTP exists
+        if (!user.otp) {
+            return res.status(400).json({ message: "No OTP found. Please request a new one." });
         }
-        // check if the otp is valid
+        
+        // Check if the OTP is expired
         if (user.otpExpiry < Date.now()) {
-        return Incorrect(req, res);
+            return res.status(400).json({ message: "OTP has expired. Please request a new one." });
         }
-        if (user.otp.toString() !== otp.toString()){
-        return Incorrect(req,res);
+        
+        // Trim and compare OTPs
+        const dbOtp = user.otp.toString().trim();
+        const receivedOtp = otp.toString().trim();
+        
+        console.log('Comparing:', `'${dbOtp}'`, 'vs', `'${receivedOtp}'`); // Debug
+        
+        if (dbOtp !== receivedOtp) {
+            return res.status(400).json({ message: "Incorrect OTP" });
         }
+        
         // Hash the new password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
         user.otp = null;
         user.otpExpiry = null;
         await user.save();
+        
         res.status(200).json({ message: "Password reset successfully" });
-
     } catch (error) {
+        console.error('Error in forgotPassword:', error);
         next(error);
     }
 };
