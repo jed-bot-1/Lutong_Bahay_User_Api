@@ -198,18 +198,19 @@ const forgotPassword = async (req, res,next) => {
          if (!user) {
            return notFoundError(req,res,next);
         }
+        if(!user.otp){
+            return Incorrect(req,res)
+        }
         // check if the otp is valid
         if (user.otpExpiry < Date.now()) {
         return Incorrect(req, res);
         }
-        if (user.otp !== otp) {
-        return Incorrect(req, res); // Wrong OTP
+        if (user.otp.toString() !== otp.toString()){
+        return Incorrect(req,res);
         }
-
         // Hash the new password
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
-
         user.otp = null;
         user.otpExpiry = null;
         await user.save();
