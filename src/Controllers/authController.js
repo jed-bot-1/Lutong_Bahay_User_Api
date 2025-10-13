@@ -159,7 +159,7 @@ const requestPasswordOtp = async (req,res,next) =>{
 
         // generate the otp
         const otp = crypto.randomInt(100000,999999).toString();
-        user.resetOtp = otp;
+        user.otp = otp;
         user.otpExpiry = Date.now() + 10*60*1000;//adding a 10 minute expiry time
         await user.save();
 
