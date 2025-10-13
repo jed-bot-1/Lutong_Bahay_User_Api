@@ -202,7 +202,9 @@ const forgotPassword = async (req, res,next) => {
         if (user.otpExpiry < Date.now()) {
         return Incorrect(req, res);
         }
-       
+        if (user.otp !== otp) {
+        return Incorrect(req, res); // Wrong OTP
+        }
 
         // Hash the new password
         const salt = await bcrypt.genSalt(10);
