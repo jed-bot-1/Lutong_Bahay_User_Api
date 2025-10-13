@@ -7,8 +7,10 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const { send } = require('process');
 require('dotenv').config();
-const { EMAIL_USER, EMAIL_PASS } = process.env;
+const brevo = require('@getbrevo/brevo')
+
 /*
 // get all avatar
 const getAvatars = async(req,res,next)=>{
@@ -162,20 +164,26 @@ const requestPasswordOtp = async (req,res,next) =>{
         await user.save();
 
         //sending the otp to the email
-        const transporter = nodemailer.createTransport({
-            service:'Gmail',
-            auth:{
-                user:process.env.EMAIL_USER,
-                pass:process.env.EMAIL_PASS
-            }
-        });
-        await transporter.sendMail({
-            from:`"Lutong Bahay"<${process.env.EMAIL_USER }`,
-            to:user.email,
-            subject:"Password Reset Request ",
-            text:`Your one-time password (OTP) is: ${otp}.\nThis code is valid for 10 minutes. \nFor security, do not share this code with anyone. .`
-        });
-        res.status(200).json({message:"OTP was sent to your email"});
+       const apiInstance = new brevo.TransactionalEmailsApi();
+       apiInstance.setApiKey(
+        brevo.TransactionalEmailsApiApiKeys.apiKey,
+        process.env.BREVO_API_KEY
+       );
+       const sendSmtpEmail = new brevo.SendSmtpEmail();
+       sendSmtpEmail.sender = { name: 'Lutong Bahay', email: process.env.EMAIL_USER };
+sendSmtpEmail.to = [{ email }]; // changed key from "mail" -> "email"
+sendSmtpEmail.subject = "Password Reset Request";
+sendSmtpEmail.textContent = `
+  Your one-time password (OTP) is: ${otp}.
+  This code is valid for 10 minutes.
+  Do not share it with anyone for security reasons.
+`;
+
+       await apiInstance.sendTransacEmail(sendSmtpEmail);
+
+    // 6️⃣ Respond success
+    res.status(200).json({ message: 'OTP has been sent to your email' });
+
     }catch(error){
         next(error);
     }
