@@ -258,15 +258,12 @@ const requestPasswordOtp = async (req, res, next) => {
     } catch (error) {
         console.error('Error in requestPasswordOtp:', error);
         
-        // Check if it's a Brevo-specific error
-        if (error.message.includes('brevo is not defined')) {
+        // If Brevo module wasn't available, log and return success without exposing OTP
+        if (error && error.message && error.message.includes('brevo is not defined')) {
             console.error('Brevo module not installed. Run: npm install @getbrevo/brevo');
-            
-            // Still return success since OTP is saved
-            return res.status(200).json({ 
-                message: "OTP has been generated",
-                otp: otp, // Include OTP for testing since email failed
-                note: "Email service temporarily unavailable. Contact support with this OTP."
+            return res.status(200).json({
+                message: 'OTP has been generated',
+                note: 'Email service temporarily unavailable. Contact support.'
             });
         }
         
