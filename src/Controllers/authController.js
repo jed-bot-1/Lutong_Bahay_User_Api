@@ -146,40 +146,102 @@ const loginUser = async (req, res,next) => {
     }
 };
 //OTP logic 
-const requestPasswordOtp = async (req,res,next) =>{
-    try{
-        const {email} = req.body;
-
-        const user = await User.findOne({ email });
-        if(!user){
-            return notFoundError(req,res,next);
+const requestPasswordOtp = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        
+        // Validate email
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ 
+                error: "Valid email address is required" 
+            });
         }
 
-        // generate the otp
-        const otp = crypto.randomInt(100000,999999).toString();
-        user.resetOtp = otp;
-        user.otpExpiry = Date.now() + 10*60*1000;//adding a 10 minute expiry time
+        const user = await User.findOne({ email });
+        
+        // Handle user not found gracefully
+        if (!user) {
+            console.log('OTP requested for non-existent email:', email);
+            return res.status(200).json({ 
+                message: "If an account exists with this email, OTP has been sent." 
+            });
+        }
+        
+        // Generate the OTP
+        const otp = crypto.randomInt(100000, 999999).toString();
+        user.otp = otp;
+        user.otpExpiry = Date.now() + 10 * 60 * 1000; // 10 minute expiry
         await user.save();
+        
+        console.log('OTP saved for', email, ':', otp);
+        
+        // Check if BREVO_API_KEY exists
+        if (!process.env.BREVO_API_KEY) {
+            console.error('BREVO_API_KEY is not set in environment variables');
+            // Still return success since OTP is saved in database
+            return res.status(200).json({ 
+                message: 'OTP has been generated successfully',
+                note: 'Please contact support as email service is currently unavailable'
+            });
+        }
 
-        //sending the otp to the email
-        const transporter = nodemailer.createTransport({
-            service:'Gmail',
-            auth:{
-                user:process.env.EMAIL_USER,
-                pass:process.env.EMAIL_PASS
-            }
+        // Check if EMAIL_USER exists
+        if (!process.env.EMAIL_USER) {
+            console.error('EMAIL_USER is not set in environment variables');
+        }
+        
+        // Sending the OTP to the email using Brevo (if available)
+        if (!brevo) {
+            console.error('Brevo package not available; skipping email send.');
+            return res.status(200).json({
+                message: 'OTP has been generated successfully',
+                note: 'Email service unavailable. Contact support.'
+            });
+        }
+
+        const apiInstance = new brevo.TransactionalEmailsApi();
+        apiInstance.setApiKey(
+            brevo.TransactionalEmailsApiApiKeys.apiKey,
+            process.env.BREVO_API_KEY
+        );
+
+        const sendSmtpEmail = new brevo.SendSmtpEmail();
+        sendSmtpEmail.sender = {
+            name: 'Lutong Bahay',
+            email: process.env.EMAIL_USER || 'noreply@lutongbahay.com'
+        };
+        sendSmtpEmail.to = [{ email: user.email }];
+        sendSmtpEmail.subject = 'Password Reset Request';
+        sendSmtpEmail.textContent = `Your one-time password (OTP) is: ${otp}.\nThis code is valid for 10 minutes.\nDo not share it with anyone for security reasons.`;
+
+        await apiInstance.sendTransacEmail(sendSmtpEmail);
+        console.log('Email sent successfully to:', email);
+
+        res.status(200).json({ message: 'OTP has been sent to your email' });
+        
+    } catch (error) {
+        console.error('Error in requestPasswordOtp:', error);
+        
+        // Check if it's a Brevo-specific error
+        if (error.message.includes('brevo is not defined')) {
+            console.error('Brevo module not installed. Run: npm install @getbrevo/brevo');
+            
+            // Still return success since OTP is saved
+            return res.status(200).json({ 
+                message: "OTP has been generated",
+                otp: otp, // Include OTP for testing since email failed
+                note: "Email service temporarily unavailable. Contact support with this OTP."
+            });
+        }
+        
+        // Generic error - still return success for security
+        res.status(200).json({ 
+            message: "If an account exists with this email, OTP has been sent.",
+            note: "Please check your email, including spam folder"
         });
-        await transporter.sendMail({
-            from:`"Lutong Bahay"<${process.env.EMAIL_USER }`,
-            to:user.email,
-            subject:"Password Reset Request ",
-            text:`Your one-time password (OTP) is: ${otp}.\nThis code is valid for 10 minutes. \nFor security, do not share this code with anyone. .`
-        });
-        res.status(200).json({message:"OTP was sent to your email"});
-    }catch(error){
-        next(error);
     }
-}
+} 
+
 // Forgot Password 
 const forgotPassword = async (req, res,next) => {
     try {
