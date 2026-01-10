@@ -182,7 +182,7 @@ const loginUser = async (req, res,next) => {
 // At the TOP of your authController.js file, add this import:
 // Make sure to install this package
 
-const requestPasswordOtp = async (req, res, next) => {
+/*const requestPasswordOtp = async (req, res, next) => {
     try {
         const { email } = req.body;
         
@@ -273,10 +273,11 @@ const requestPasswordOtp = async (req, res, next) => {
             note: "Please check your email, including spam folder"
         });
     }
-}// Forgot Password 
+}*/
+// Forgot Password 
 const forgotPassword = async (req, res,next) => {
     try {
-        const { email, newPassword,otp } = req.body;
+        const { email, newPassword } = req.body;
 
         // Check if user exists
         const user = await User.findOne({ email });
