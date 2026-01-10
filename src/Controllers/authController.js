@@ -356,4 +356,4 @@ const deleteUser = async (req, res) => {
 
 
 
-module.exports = { getUsers, registerUser, loginUser,deleteUser, forgotPassword, editProfile,getme,getAvatar,requestPasswordOtp,updateEmail };
+module.exports = { getUsers, registerUser, loginUser,deleteUser, forgotPassword, editProfile,getme,getAvatar,updateEmail };
