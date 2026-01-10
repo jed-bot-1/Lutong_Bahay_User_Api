@@ -146,7 +146,7 @@ const loginUser = async (req, res,next) => {
     }
 };
 //OTP logic 
-const requestPasswordOtp = async (req, res, next) => {
+/*const requestPasswordOtp = async (req, res, next) => {
     try {
         const { email } = req.body;
         
@@ -241,11 +241,11 @@ const requestPasswordOtp = async (req, res, next) => {
         });
     }
 } 
-
+*/
 // Forgot Password 
 const forgotPassword = async (req, res,next) => {
     try {
-        const { email, newPassword,otp } = req.body;
+        const { email, newPassword} = req.body;
 
         // Check if user exists
         const user = await User.findOne({ email });
